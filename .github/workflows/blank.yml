@@ -1,45 +1,65 @@
 
-name: Binance TR APK Derleme
+name: Binance TR APK Build
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'BinanceTRBotApp_source.zip'
-      - '.github/workflows/**'
+      - "BinanceTRBotApp_source.zip"
+      - ".github/workflows/blank.yml"
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Depoyu indir
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Java kur
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
-      - name: Android araçlarını kur
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Gradle kur
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.13'
-
-      - name: Projeyi ZIP dosyasından çıkar
+      - name: Install Android SDK packages
         run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Check source ZIP
+        run: |
+          test -f BinanceTRBotApp_source.zip
+          unzip -l BinanceTRBotApp_source.zip
+
+      - name: Extract Android project
+        run: |
+          mkdir -p android-project
           unzip -q BinanceTRBotApp_source.zip -d android-project
+          find android-project -maxdepth 3 -type f | head -80
 
-      - name: APK oluştur
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
         working-directory: android-project
-        run: gradle --no-daemon assembleDebug
+        run: |
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew --no-daemon assembleDebug
+          else
+            gradle --no-daemon assembleDebug
+          fi
 
-      - name: APK dosyasını kaydet
+      - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: BinanceTRBot-APK
-          path: android-project/app/build/outputs/apk/debug/app-debug.apk
+          path: android-project/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
