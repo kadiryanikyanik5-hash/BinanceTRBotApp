@@ -23,7 +23,7 @@ jobs:
           java-version: '17'
 
       - name: Android araçlarını kur
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Gradle kur
         uses: gradle/actions/setup-gradle@v4
