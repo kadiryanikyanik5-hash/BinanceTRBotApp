@@ -14,7 +14,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,23 +27,16 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Install Android SDK packages
-        run: |
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-
       - name: Check source ZIP
         run: |
           test -f BinanceTRBotApp_source.zip
-          unzip -l BinanceTRBotApp_source.zip
+          unzip -t BinanceTRBotApp_source.zip
 
       - name: Extract Android project
         run: |
           mkdir -p android-project
           unzip -q BinanceTRBotApp_source.zip -d android-project
-          find android-project -maxdepth 3 -type f | head -80
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+          test -f android-project/settings.gradle -o -f android-project/settings.gradle.kts -o -f android-project/gradlew -o -f android-project/app/build.gradle -o -f android-project/app/build.gradle.kts
 
       - name: Build debug APK
         working-directory: android-project
@@ -52,8 +44,11 @@ jobs:
           if [ -f gradlew ]; then
             chmod +x gradlew
             ./gradlew --no-daemon assembleDebug
-          else
+          elif command -v gradle >/dev/null 2>&1; then
             gradle --no-daemon assembleDebug
+          else
+            echo "Gradle wrapper or installed Gradle was not found."
+            exit 1
           fi
 
       - name: Upload APK
