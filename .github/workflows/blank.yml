@@ -13,13 +13,14 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -27,28 +28,52 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Check source ZIP
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Check and extract ZIP
         run: |
           test -f BinanceTRBotApp_source.zip
           unzip -t BinanceTRBotApp_source.zip
-
-      - name: Extract Android project
-        run: |
           mkdir -p android-project
           unzip -q BinanceTRBotApp_source.zip -d android-project
-          test -f android-project/settings.gradle -o -f android-project/settings.gradle.kts -o -f android-project/gradlew -o -f android-project/app/build.gradle -o -f android-project/app/build.gradle.kts
+          echo "ZIP extracted successfully"
+          find android-project -maxdepth 4 -type f | head -100
 
-      - name: Build debug APK
-        working-directory: android-project
+      - name: Find Android project
+        id: project
+        run: |
+          ROOT=""
+          WRAPPER=$(find android-project -type f -name gradlew -print -quit)
+          if [ -n "$WRAPPER" ]; then
+            ROOT=$(dirname "$WRAPPER")
+          else
+            SETTINGS=$(find android-project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)
+            if [ -n "$SETTINGS" ]; then
+              ROOT=$(dirname "$SETTINGS")
+            fi
+          fi
+          if [ -z "$ROOT" ]; then
+            echo "ERROR: Android Gradle project not found in ZIP."
+            exit 1
+          fi
+          echo "dir=$ROOT" >> "$GITHUB_OUTPUT"
+          echo "Project directory: $ROOT"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Build APK
+        working-directory: ${{ steps.project.outputs.dir }}
         run: |
           if [ -f gradlew ]; then
             chmod +x gradlew
             ./gradlew --no-daemon assembleDebug
-          elif command -v gradle >/dev/null 2>&1; then
-            gradle --no-daemon assembleDebug
           else
-            echo "Gradle wrapper or installed Gradle was not found."
-            exit 1
+            gradle --no-daemon assembleDebug
           fi
 
       - name: Upload APK
