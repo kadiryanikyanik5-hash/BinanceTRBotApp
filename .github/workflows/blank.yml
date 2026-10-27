@@ -1,0 +1,47 @@
+
+name: Binance TR APK Derleme
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'BinanceTRBotApp_source.zip'
+      - '.github/workflows/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Depoyu indir
+        uses: actions/checkout@v4
+
+      - name: Java kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android araçlarını kur
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle kur
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Projeyi ZIP dosyasından çıkar
+        run: |
+          unzip -q BinanceTRBotApp_source.zip -d android-project
+
+      - name: APK oluştur
+        working-directory: android-project
+        run: gradle --no-daemon assembleDebug
+
+      - name: APK dosyasını kaydet
+        uses: actions/upload-artifact@v4
+        with:
+          name: BinanceTRBot-APK
+          path: android-project/app/build/outputs/apk/debug/app-debug.apk
+
+
