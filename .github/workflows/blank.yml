@@ -1,0 +1,81 @@
+name: Binance TR APK Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "BinanceTRBotApp_source.zip"
+      - ".github/workflows/blank.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Check ZIP
+        run: |
+          test -s BinanceTRBotApp_source.zip
+          unzip -t BinanceTRBotApp_source.zip
+
+      - name: Extract project
+        run: |
+          mkdir -p android-project
+          unzip -q BinanceTRBotApp_source.zip -d android-project
+          find android-project -maxdepth 5 -type f | head -100
+
+      - name: Find Android project
+        id: locate
+        run: |
+          ROOT=""
+          WRAPPER=$(find android-project -type f -name gradlew -print -quit)
+          if [ -n "$WRAPPER" ]; then
+            ROOT=$(dirname "$WRAPPER")
+          else
+            SETTINGS=$(find android-project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)
+            if [ -n "$SETTINGS" ]; then
+              ROOT=$(dirname "$SETTINGS")
+            fi
+          fi
+          if [ -z "$ROOT" ]; then
+            echo "::error::ZIP içinde Android Gradle projesi bulunamadı."
+            exit 1
+          fi
+          echo "dir=$ROOT" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK
+        working-directory: ${{ steps.locate.outputs.dir }}
+        run: |
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew --no-daemon assembleDebug
+          else
+            gradle --no-daemon assembleDebug
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BinanceTRBot-APK
+          path: android-project/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+        
